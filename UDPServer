@@ -1,0 +1,82 @@
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.util.concurrent.TimeUnit;
+
+
+/**
+ * UDP server class
+ */
+public class UDPServer implements Runnable{
+	private String MessageCode = "TIME?";
+	private int DELTATIME = 0;
+	private DatagramSocket server;
+	private byte[] receiveData;
+	private byte[] sendData = new byte[1024];
+	private InetAddress ClientIPAddress;
+	private int ClientPort;
+	public UDPServer(int port) {
+		try {
+			server = new DatagramSocket(port);
+			System.out.println("UDP Server Started " + port);
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
+	}
+
+
+	public void start (){
+		while(true){
+			receiveData = new byte[1024];
+			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
+			try {
+				server.receive(receivePacket);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			ClientIPAddress = receivePacket.getAddress();
+			ClientPort = receivePacket.getPort();
+			System.out.println("The following client has connected:" + ClientIPAddress.getHostAddress() + " : " + ClientPort);
+			byte[] data = receivePacket.getData();
+			String message = new String(data);
+			message = message.replaceAll("\u0000.*", "");
+			System.out.println(message);
+			processMessage(message);
+		}
+	}
+	private void processMessage (String message){
+    	if(message.contains(MessageCode)){
+    		if(!message.equals(MessageCode)){
+				System.out.println(message);
+				DELTATIME = Integer.parseInt(message.split("\\?")[1]);
+    		}
+    		long millis  =  System.currentTimeMillis() + DELTATIME;
+    		String hms = String.format("%02d:%02d:%02d", TimeUnit.MILLISECONDS.toHours(millis),
+    			    TimeUnit.MILLISECONDS.toMinutes(millis) % TimeUnit.HOURS.toMinutes(1),
+    			    TimeUnit.MILLISECONDS.toSeconds(millis) % TimeUnit.MINUTES.toSeconds(1));
+    		System.out.println(hms);
+    		
+            this.sendData(MessageCode + hms, ClientIPAddress, ClientPort);
+    	}else{
+    		System.out.println("ERROR : Wrong Code");
+    	}
+    }
+	
+	
+	public void sendData(String data, InetAddress IPAddress, int port) {
+		try {
+			sendData = data.getBytes();
+			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+			server.send(sendPacket);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void run() {
+		start();
+	}
+}
