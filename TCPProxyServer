@@ -1,0 +1,51 @@
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+
+
+/**
+ * This is class for TCP proxy server
+ */
+public class TCPProxyServer implements Runnable {
+	 private ServerSocket TCPServer = null;
+	 private int TCPPORT;
+	 private int TCPServerPort;
+	 private Socket TCPsock = null;
+
+	/**
+	 *  Constructor for tcp proxy server
+	 * @param tcpPort proxy server open port
+	 * @param tcpServerPort origin server open port
+     */
+	 public TCPProxyServer(int tcpPort, int tcpServerPort ) {
+		 this.TCPPORT = tcpPort;
+		 this.TCPServerPort = tcpServerPort;
+		 try {
+			this.TCPServer = new ServerSocket(tcpPort);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		System.out.println("Server Started.. Listenting on port " + this.TCPPORT);
+		
+	}
+
+	/**
+	 *
+	 */
+	public void start(){
+		while (true){
+    		try {
+    			TCPsock = TCPServer.accept();
+				System.out.println("The following client has connected:" + TCPsock.getInetAddress().getCanonicalHostName());
+    			new Thread(new TCPProxyServerThread(TCPServerPort,TCPsock)).start();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+    	}
+	}
+
+	@Override
+	public void run() {
+		start();
+	}
+}
