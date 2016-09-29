@@ -1,0 +1,120 @@
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.Socket;
+import java.util.ArrayList;
+
+/**
+ * Multi-thread TCP proxy server class
+ */
+public class TCPProxyServerThread extends iProtocol implements Runnable{
+
+	private Socket socket = null;
+    private ObjectInputStream oisServer;
+    private ObjectOutputStream ooServer;
+    //Streams to connect server
+    
+    
+
+    private ObjectInputStream oisClient;
+    private ObjectOutputStream ooClient;
+    //Streams to connect client
+    ArrayList<iProtocol> receivedpacket = new ArrayList<>();
+    
+    
+    /**
+     *   Initiate proxy server
+     * @param port ServerPort
+     */
+    public TCPProxyServerThread(int port, Socket connection) {
+        try {
+            socket = new Socket("localhost",port);
+            System.out.println("Connection established!");
+
+            ooServer = new ObjectOutputStream(socket.getOutputStream());
+            oisServer = new ObjectInputStream(socket.getInputStream());
+            //streams to connect to the TCP server
+
+            ooClient = new ObjectOutputStream(connection.getOutputStream());
+            oisClient = new ObjectInputStream(connection.getInputStream());
+            //Streams to connect to clients
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+	}
+
+    /**
+     *
+     * @param rcp
+     * @return
+     */
+    private iProtocol[] fromListToArray(ArrayList<iProtocol> rcp){
+    	int i = 0;
+    	iProtocol[] packets = new iProtocol[rcp.size()];
+		for (iProtocol iprotocol : rcp) {
+			packets[i] = iprotocol;
+			i++;
+		}
+		return packets;
+    }
+    
+    
+    public String receivePackets(ObjectInputStream ois) {
+  
+        String messages = "";
+        try {
+            iProtocol i;
+            while (!(i = (iProtocol) oisServer.readObject()).message.equals("!!")) {
+                receivedpacket.add(i);
+            }
+            for (iProtocol ip : receivedpacket) {
+            	if(ip.message.contains("@")){
+            		ip.message = ip.message.substring(0,1);
+            	}
+                messages = messages + ip.message;
+            }
+           
+            System.out.println(messages);
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return  messages;
+    }
+    
+    
+    void sendPackets(iProtocol[] packets, ObjectOutputStream oos) {
+        try {
+            for(iProtocol i : packets){
+            	ooClient.writeObject(i);
+            }
+            iProtocol EOFPacket = new iProtocol();
+            EOFPacket.message = "!!";
+            ooClient.writeObject(EOFPacket);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     *
+     */
+    @Override
+	public void run() {
+		receivePackets(oisClient);//from client
+		sendPackets(fromListToArray(receivedpacket), ooServer); //To server
+		receivePackets(oisServer); //From Server
+		sendPackets(fromListToArray(receivedpacket), ooClient);//To Client
+		try {
+			ooServer.close();
+			oisServer.close();
+			ooClient.close();
+			oisClient.close();
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+}
