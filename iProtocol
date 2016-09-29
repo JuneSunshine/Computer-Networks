@@ -1,0 +1,105 @@
+package mhvcs;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.Serializable;
+import java.util.Arrays;
+
+/**
+ * This is the customized protocol class for designing the protocol methods
+ */
+
+
+
+public class iProtocol implements Serializable {
+
+    private static final long serialVersionUID = 585622801819900624L;
+    public int messageId;
+    //Meta data OR Header
+    public int checksum = 0;
+    public String sender = "";
+    public String receiver = "";
+    public String message = null;
+    public int sequenceNumber = 0;
+    //Data
+
+    /**
+     *  Calculate the checkSum value
+     * @param s:   The strings to be sent
+     * @return checkSum value
+     */
+    public int calculateCheckSum(String s) {
+        int checkSum = 0;
+        for (int i = 0; i < s.length(); i++) {
+            checkSum += (int) s.charAt(i);
+        }
+        return checkSum;
+    }
+
+    /**
+     *  Split messages into chunks
+     * @param original Message needs to be sent
+     * @param length max length per packet
+     * @return chunks of message
+     * @throws IOException
+     */
+    public String[] splitChunks(String original, int length) {
+
+        int numofchunks =  (original.length() % length) > 0 ? 
+        		(int) (original.length() / length)  + 1 : 
+        			(original.length() / length);
+        // calculate number of chunks we need
+        char buff = '@';
+        boolean addBuff = (original.length() % length) != 0 ;
+        // check if it is necessary to add extra symbol to make the last package full
+       
+        
+        ByteArrayInputStream bis = new ByteArrayInputStream(original.getBytes());
+        String[] chunks = new String[numofchunks];
+        int n = 0;
+        int i = 0;
+        byte[] buffer = new byte[length];
+        String result = "";
+        try {
+            while ((n = bis.read(buffer)) > 0){
+                for (byte b : buffer) {
+                    result += (char) b;
+                }
+                chunks[i] = result;
+                i++;
+                result = "";
+                Arrays.fill(buffer, (byte) 0);
+            }
+            if(addBuff)
+            	chunks[chunks.length-1] = chunks[chunks.length-1] + buff;
+            
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return chunks;
+    }
+
+
+    /**
+     *  Make chunks into packets to be sent
+     * @param chunks split messages
+     * @return packets
+     */
+    public iProtocol[] makeChunks(String[] chunks) {
+        iProtocol[] packets = new iProtocol[chunks.length];
+        String sender = "";
+        String receiver = "";
+        int port = 1234;
+        int i = 0;
+        for (String chunk : chunks){
+            iProtocol packet = new iProtocol();
+            packet.message = chunk;
+            packet.sender = sender;
+            packet.receiver = receiver;
+            packet.sequenceNumber = i;
+            packet.checksum = this.calculateCheckSum(chunk);
+            packets[i] = packet;
+            i++;
+        }
+        return packets;
+    }
+}
