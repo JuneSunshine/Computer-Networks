@@ -1,0 +1,146 @@
+package mhvcs;
+
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.sql.Date;
+import java.util.ArrayList;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
+
+
+/**
+ * This is the TCP server class
+ */
+public class TCPServer extends iProtocol implements Runnable{
+    private ServerSocket server = null;
+    private int PORT;
+    private Socket sock = null;
+    private int DELTATIME = 0;
+    private ObjectInputStream ois;
+    private ObjectOutputStream oo;
+    private String MessageCode = "TIME?";
+    private int BYTESPERPACKET = 2;
+    private ArrayList<iProtocol> receivedpacket = new ArrayList<>();
+
+    /**
+     *  Constructor for TCP server
+     * @param port the port sever opens
+     * @param deltaTime
+     */
+    public TCPServer(int port, int deltaTime) {
+        DELTATIME = deltaTime;
+        this.PORT = port;
+        try {
+			server = new ServerSocket(port);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+        System.out.println(" TCP Server Started :) ! " + port);
+        System.out.println();
+    }
+
+    /**
+     * Ready the server and handle the messages
+     */
+    public void init(){
+    	while (true){
+    		try {
+                sock = server.accept();
+                // establish connection
+                oo = new ObjectOutputStream(sock.getOutputStream());
+                ois = new ObjectInputStream(sock.getInputStream());
+                String message = receivePackets();
+                // receive messages
+                processMessage(message);
+                // read messages
+                oo.close();
+                ois.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+    	}
+    }
+
+    /**
+     * Process received messages
+     * @param message received messages
+     */
+    private void processMessage (String message){
+    	if(message.contains(MessageCode)){
+    		if(!message.equals(MessageCode)){
+                System.out.println(message);
+                DELTATIME = Integer.parseInt(message.split("\\?")[1]);
+    		}
+    		long millis  =  System.currentTimeMillis() + DELTATIME;
+    		String hms = String.format("%02d:%02d:%02d",
+                    TimeUnit.MILLISECONDS.toHours(millis) ,
+                    TimeUnit.MILLISECONDS.toMinutes(millis) - TimeUnit.HOURS.toMinutes(
+                            TimeUnit.MILLISECONDS.toHours(millis)),
+                    TimeUnit.MILLISECONDS.toSeconds(millis) - TimeUnit.MINUTES.toSeconds(
+                            TimeUnit.MILLISECONDS.toMinutes(millis)));
+    		System.out.println(hms);
+    		String[] chunks = this.splitChunks(MessageCode + hms, BYTESPERPACKET);
+            iProtocol[] packets = this.makeChunks(chunks);
+            this.sendPackets(packets);
+    	}else{
+    		System.out.println("ERROR : Wrong Code");
+    	}
+    }
+
+
+    /**
+     *  Send packets to client
+     * @param packets packets
+     */
+    void sendPackets(iProtocol[] packets) {
+        try {
+            for(iProtocol i : packets){
+                oo.writeObject(i);
+                // write all the objects to stream
+            }
+            iProtocol EOFPacket = new iProtocol();
+            EOFPacket.message = "!!";
+            oo.writeObject(EOFPacket);
+            // add the last packet as an end-of-file packet indicating the end of pakcets
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     *  Receive packets from client
+     * @return messages received
+     */
+    public String receivePackets() {
+        String messages = "";
+        try {
+            iProtocol i;
+            while (!(i = (iProtocol) ois.readObject()).message.equals("!!")) {
+                receivedpacket.add(i);
+                // Before reaching the end of stream, keep reading and adding packets to array
+            }
+            for (iProtocol ip : receivedpacket) {
+            	if(ip.message.contains("@")){
+            		ip.message = ip.message.substring(0,1);
+                    // get rid of the extra symbol added
+            	}
+                messages = messages + ip.message;
+            }
+            receivedpacket.clear();
+            // clear the array
+            System.out.println(messages + " request from client :");
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return messages;
+    }
+
+    @Override
+    public void run() {
+        init();
+    }
+}
