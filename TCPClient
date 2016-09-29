@@ -1,0 +1,78 @@
+import java.io.*;
+import java.net.Socket;
+import java.util.ArrayList;
+
+
+public class TCPClient extends iProtocol{
+
+    private Socket socket = null;
+    private ObjectInputStream ois;
+    private ObjectOutputStream oo;
+    ArrayList<iProtocol> receivedpacket = new ArrayList<>();
+
+    /**
+     * Constructor for TCP client
+     * @param port the port client will connect
+     */
+    public TCPClient(int port) {
+        try {
+            socket = new Socket("localhost",port);
+            System.out.println("Connection established!");
+            oo = new ObjectOutputStream(socket.getOutputStream());
+            ois = new ObjectInputStream(socket.getInputStream());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+
+    /**
+     *  Send packets to server
+     * @param packets packers to be sent
+     */
+    public void sendPackets(iProtocol[] packets) {
+        try {
+            for(iProtocol i : packets){
+                oo.writeObject(i);
+                // write each packet to stream
+            }
+            iProtocol EOFPacket = new iProtocol();
+            EOFPacket.message = "!!";
+            oo.writeObject(EOFPacket);
+            // write end-of-file packet to stream
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+
+    /**
+     *  Receive packets from server
+     * @return messages received
+     */
+    public String receivePackets() {
+        String messages = "";
+        try {
+            iProtocol i;
+            while (!(i = (iProtocol) ois.readObject()).message.equals("!!")) {
+                receivedpacket.add(i);
+                // keep receiving and adding packets to array
+            }
+            for (iProtocol ip : receivedpacket) {
+            	if(ip.message.contains("@")){
+            		ip.message = ip.message.substring(0,1);
+                    // get rid of extra symbol
+            	}
+                messages = messages + ip.message;
+            }
+            receivedpacket.clear();
+            System.out.println(messages);
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
+        }
+        return messages;
+    }
+}
+
+
