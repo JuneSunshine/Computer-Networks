@@ -1,0 +1,68 @@
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+
+public class UDPProxyServerThread implements Runnable{
+	private InetAddress ClientIPAddress;
+	private int ClientPort;
+	private int ServerPort; //Port of origin UDP server;
+	private String Message;
+	private String response;
+
+	private DatagramSocket socket;//client for UDP server
+	public UDPProxyServerThread(InetAddress ClientIPAddress, int ClientPort, int serverPort, String message) {
+		// TODO Auto-generated constructor stub
+		this.Message = message;
+		this.ClientIPAddress = ClientIPAddress;
+		this.ClientPort = ClientPort;
+		this.ServerPort = serverPort;
+		try {
+			socket = new DatagramSocket();
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	public void sendData (String data) {
+		byte [] sendData = data.getBytes() ;
+        DatagramPacket packet;
+		try {
+			byte[] receiveData = new byte[1024];
+			packet = new DatagramPacket( sendData, sendData.length, InetAddress.getByName( "localhost" ), ServerPort );
+			socket.send( packet ) ;
+			DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);       
+			socket.receive(receivePacket);
+			receiveData = receivePacket.getData();
+			String message = new String(receiveData);
+			response = message.replaceAll("\u0000.*", "");
+			System.out.println(response);
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	
+	
+	public void sendDataToClient(String data, InetAddress IPAddress, int port) {
+		try {
+			byte[] sendData = data.getBytes();
+			DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, IPAddress, port);
+			socket.send(sendPacket);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+	@Override
+	public void run() {
+		sendData(Message);
+		sendDataToClient(response, ClientIPAddress, ClientPort);		
+	}
+}
